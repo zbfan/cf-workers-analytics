@@ -7,7 +7,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "analytics-db"
-database_id = ""
+database_id = "d6027b7b-74a3-4961-8e9a-2a879cc1b28f"
 
 # Environment variables
 [vars]

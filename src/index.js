@@ -1,6 +1,5 @@
 import { handleTrack } from './track';
 import { handleApi } from './api';
-import { handleDashboard } from './dashboard';
 import { serveDashboard } from './static';
 
 // Main entry point for Cloudflare Worker
