@@ -1,188 +1,144 @@
 /**
  * Device Detection Module
- * Parses User-Agent strings to extract detailed device, browser, OS info
- * Uses a lightweight regex-based approach for Cloudflare Workers
+ * Uses device-detector-js (port of matomo-org/device-detector) for accurate UA parsing
+ * Falls back to basic regex patterns if library is unavailable
  */
+import DeviceDetector from 'device-detector-js';
 
-// Known device brands for better detection
-const DEVICE_BRANDS = {
-  'samsung': 'Samsung',
-  'apple': 'Apple',
-  'huawei': 'Huawei',
-  'xiaomi': 'Xiaomi',
-  'oppo': 'OPPO',
-  'vivo': 'vivo',
-  'oneplus': 'OnePlus',
-  'google': 'Google',
-  'lg': 'LG',
-  'sony': 'Sony',
-  'nokia': 'Nokia',
-  'motorola': 'Motorola',
-  'lenovo': 'Lenovo',
-  'asus': 'ASUS',
-  'acer': 'Acer',
-  'dell': 'Dell',
-  'hp': 'HP',
-  'mi': 'Xiaomi',
-  'redmi': 'Xiaomi',
-  'realme': 'realme',
-  'honor': 'Honor',
-};
-
-// OS detection patterns
-const OS_PATTERNS = [
-  { name: 'Windows', version: /Windows NT ([0-9.]+)/, pattern: /Windows/ },
-  { name: 'macOS', version: /Mac OS X ([0-9._]+)/, pattern: /Mac OS X/ },
-  { name: 'macOS', version: /Intel Mac OS X ([0-9._]+)/, pattern: /Intel Mac OS X/ },
-  { name: 'iOS', version: /iPhone OS ([0-9._]+)/, pattern: /iPhone OS/ },
-  { name: 'iOS', version: /iPad.*OS ([0-9._]+)/, pattern: /iPad/ },
-  { name: 'Android', version: /Android ([0-9.]+)/, pattern: /Android/ },
-  { name: 'Linux', pattern: /Linux/, version: null },
-  { name: 'Ubuntu', pattern: /Ubuntu/, version: null },
-  { name: 'Chrome OS', pattern: /CrOS/, version: null },
-  { name: 'HarmonyOS', pattern: /HarmonyOS/, version: null },
-];
-
-// Browser detection patterns
-const BROWSER_PATTERNS = [
-  { name: 'Chrome', version: /Chrome\/([0-9.]+)/, pattern: /Chrome\//, exclude: [/Edg\//, /OPR\//, /SamsungBrowser\//] },
-  { name: 'Safari', version: /Version\/([0-9.]+)/, pattern: /Safari\//, exclude: [/Chrome\//, /Edg\//, /OPR\//] },
-  { name: 'Firefox', version: /Firefox\/([0-9.]+)/, pattern: /Firefox\// },
-  { name: 'Edge', version: /Edg\/([0-9.]+)/, pattern: /Edg\// },
-  { name: 'Opera', version: /OPR\/([0-9.]+)/, pattern: /OPR\// },
-  { name: 'Opera', version: /Opera\/([0-9.]+)/, pattern: /Opera/ },
-  { name: 'Samsung Internet', version: /SamsungBrowser\/([0-9.]+)/, pattern: /SamsungBrowser\// },
-  { name: 'UC Browser', version: /UCBrowser\/([0-9.]+)/, pattern: /UCBrowser/ },
-  { name: 'QQ Browser', version: /QQBrowser\/([0-9.]+)/, pattern: /QQBrowser/ },
-  { name: 'WeChat', version: /MicroMessenger\/([0-9.]+)/, pattern: /MicroMessenger/ },
-  { name: 'Baidu', version: /Baidu\/([0-9.]+)/, pattern: /Baidu/ },
-  { name: 'IE', version: /MSIE ([0-9.]+)/, pattern: /MSIE/ },
-  { name: 'IE', version: /Trident\/[0-9.]+.*rv:([0-9.]+)/, pattern: /Trident\// },
-  { name: 'Brave', version: /Brave\/([0-9.]+)/, pattern: /Brave\// },
-  { name: 'Vivaldi', version: /Vivaldi\/([0-9.]+)/, pattern: /Vivaldi\// },
-];
-
-// Device type detection
-const DEVICE_PATTERNS = [
-  { type: 'smartphone', patterns: [/iPhone/, /Android.*Mobile/, /Mobile.*Android/, /SAMSUNG.*Mobile/, /BlackBerry/, /IEMobile/, /Mobi/] },
-  { type: 'tablet', patterns: [/iPad/, /Tablet/, /Android(?!.*Mobile)/, /Silk/, /Kindle/] },
-  { type: 'desktop', patterns: [/Windows NT/, /Macintosh/, /Linux x86_64/, /CrOS/] },
-  { type: 'smarttv', patterns: [/SmartTV/, /TV/, /AppleTV/, /GoogleTV/] },
-  { type: 'console', patterns: [/PlayStation/, /Xbox/, /Nintendo/] },
-  { type: 'wearable', patterns: [/Watch/, /Fitbit/] },
-];
-
-// ISP detection patterns from User-Agent
-function detectISP(ua) {
-  const ispPatterns = [
-    { name: '中国电信', patterns: [/China Telecom/i, /CT/] },
-    { name: '中国联通', patterns: [/China Unicom/i, /CU/] },
-    { name: '中国移动', patterns: [/China Mobile/i, /CM/] },
-    { name: '中国广电', patterns: [/CBN/i] },
-  ];
-  for (const isp of ispPatterns) {
-    if (isp.patterns.some(p => p.test(ua))) return isp.name;
-  }
-  return '';
-}
+// Shared device detector instance
+const detector = new DeviceDetector();
 
 /**
  * Parse User-Agent string to extract detailed device information
+ * @returns {Object} { browser, browser_version, os, os_version, device, device_brand, device_model, is_mobile, engine, engine_version }
  */
 export function parseUserAgent(ua) {
   if (!ua) return getDefaultDeviceInfo();
 
+  try {
+    const result = detector.parse(ua);
+
+    const browser = result.browser || {};
+    const os = result.os || {};
+    const device = result.device || {};
+    const client = result.client || {};
+
+    // Determine device type and brand
+    const deviceType = device.type || 'desktop';
+    const isMobile = (deviceType === 'smartphone' || deviceType === 'tablet') ? 1 : 0;
+
+    // Get brand/model
+    let brand = device.brand || '';
+    let model = device.model || '';
+
+    // Try to get more details from client
+    let browserName = client.name || browser.name || '';
+    let browserVersion = client.version || browser.version || '';
+    let osName = os.name || '';
+    let osVersion = os.version || '';
+
+    // Clean up names for consistency
+    if (!browserName && /Edg\//i.test(ua)) browserName = 'Edge';
+    if (!browserName && /OPR\//i.test(ua)) browserName = 'Opera';
+
+    return {
+      browser: browserName || 'Unknown',
+      browser_version: browserVersion || '',
+      os: osName || 'Unknown',
+      os_version: osVersion || '',
+      device: mapDeviceType(deviceType),
+      device_brand: brand || '',
+      device_model: model || '',
+      is_mobile: isMobile,
+      engine: (result.engine || {}).name || '',
+      engine_version: (result.engine || {}).version || '',
+    };
+  } catch (e) {
+    // Fallback: basic parsing if library fails
+    return basicParse(ua);
+  }
+}
+
+/**
+ * Map device-detector types to our types
+ */
+function mapDeviceType(type) {
+  const typeMap = {
+    'smartphone': 'smartphone',
+    'tablet': 'tablet',
+    'desktop': 'desktop',
+    'smart_tv': 'smarttv',
+    'tv': 'smarttv',
+    'console': 'console',
+    'car': 'desktop',
+    'portable_media_player': 'desktop',
+    'camera': 'desktop',
+    'phablet': 'smartphone',
+    'feature phone': 'smartphone',
+    'unknown': 'unknown',
+  };
+  return typeMap[type] || 'desktop';
+}
+
+/**
+ * Basic regex-based fallback parsing
+ */
+function basicParse(ua) {
   const result = {
-    browser: '',
-    browser_version: '',
-    os: '',
-    os_version: '',
-    device: '',
-    device_brand: '',
-    device_model: '',
-    is_mobile: 0,
-    isp: '',
+    browser: 'Unknown', browser_version: '',
+    os: 'Unknown', os_version: '',
+    device: 'desktop', device_brand: '', device_model: '',
+    is_mobile: 0, engine: '', engine_version: '',
   };
 
-  // Detect Browser
-  for (const browser of BROWSER_PATTERNS) {
-    if (browser.pattern.test(ua)) {
-      const excluded = browser.exclude?.some(e => e.test(ua));
-      if (!excluded) {
-        result.browser = browser.name;
-        if (browser.version) {
-          const match = ua.match(browser.version);
-          if (match) result.browser_version = match[1];
-        }
-        break;
-      }
-    }
-  }
-
-  // Detect OS
-  for (const os of OS_PATTERNS) {
-    if (os.pattern.test(ua)) {
-      result.os = os.name;
-      if (os.version) {
-        const match = ua.match(os.version);
-        if (match) result.os_version = match[1].replace(/_/g, '.');
-      }
-      break;
-    }
-  }
-
-  // Detect device type
-  for (const deviceType of DEVICE_PATTERNS) {
-    if (deviceType.patterns.some(p => p.test(ua))) {
-      result.device = deviceType.type;
-      result.is_mobile = (deviceType.type === 'smartphone' || deviceType.type === 'tablet') ? 1 : 0;
-      break;
-    }
-  }
-  if (!result.device) result.device = 'unknown';
-
-  // Detect device brand
-  for (const [key, brand] of Object.entries(DEVICE_BRANDS)) {
-    const brandRegex = new RegExp(key, 'i');
-    if (brandRegex.test(ua)) {
-      result.device_brand = brand;
-      break;
-    }
-  }
-
-  // Try to extract device model
-  const modelPatterns = [
-    /SM-[A-Z0-9]+/,
-    /iPhone[0-9,]+/,
-    /iPad[0-9,]+/,
-    /MI [A-Z0-9]+/,
-    /Redmi [A-Z0-9]+/,
-    /Pixel [0-9]+/,
+  // Browser detection
+  const browserPatterns = [
+    { name: 'Chrome', version: /Chrome\/([0-9.]+)/, pattern: /Chrome\//, exclude: [/Edg\//, /OPR\//, /SamsungBrowser\//] },
+    { name: 'Safari', version: /Version\/([0-9.]+)/, pattern: /Safari\//, exclude: [/Chrome\//, /Edg\//, /OPR\//] },
+    { name: 'Firefox', version: /Firefox\/([0-9.]+)/, pattern: /Firefox\// },
+    { name: 'Edge', version: /Edg\/([0-9.]+)/, pattern: /Edg\// },
+    { name: 'Opera', version: /OPR\/([0-9.]+)/, pattern: /OPR\// },
+    { name: 'Samsung Browser', version: /SamsungBrowser\/([0-9.]+)/, pattern: /SamsungBrowser\// },
+    { name: 'WeChat', version: /MicroMessenger\/([0-9.]+)/, pattern: /MicroMessenger/ },
   ];
-  for (const pattern of modelPatterns) {
-    const match = ua.match(pattern);
-    if (match) {
-      result.device_model = match[0];
+
+  for (const b of browserPatterns) {
+    if (b.pattern.test(ua) && !b.exclude?.some(e => e.test(ua))) {
+      result.browser = b.name;
+      if (b.version) { const m = ua.match(b.version); if (m) result.browser_version = m[1]; }
       break;
     }
   }
 
-  // Detect ISP from UA
-  result.isp = detectISP(ua);
+  // OS detection
+  const osPatterns = [
+    { name: 'Windows', version: /Windows NT ([0-9.]+)/, pattern: /Windows/ },
+    { name: 'macOS', version: /Mac OS X ([0-9._]+)/, pattern: /Mac OS X/ },
+    { name: 'iOS', version: /iPhone OS ([0-9._]+)/, pattern: /iPhone OS/ },
+    { name: 'Android', version: /Android ([0-9.]+)/, pattern: /Android/ },
+    { name: 'Linux', pattern: /Linux/ },
+  ];
+
+  for (const o of osPatterns) {
+    if (o.pattern.test(ua)) {
+      result.os = o.name;
+      if (o.version) { const m = ua.match(o.version); if (m) result.os_version = m[1].replace(/_/g, '.'); }
+      break;
+    }
+  }
+
+  // Device detection
+  if (/iPhone|Android.*Mobile/i.test(ua)) { result.device = 'smartphone'; result.is_mobile = 1; }
+  else if (/iPad|Tablet|Kindle|Silk/i.test(ua)) { result.device = 'tablet'; result.is_mobile = 1; }
 
   return result;
 }
 
 function getDefaultDeviceInfo() {
   return {
-    browser: 'Unknown',
-    browser_version: '',
-    os: 'Unknown',
-    os_version: '',
-    device: 'unknown',
-    device_brand: '',
-    device_model: '',
-    is_mobile: 0,
-    isp: '',
+    browser: 'Unknown', browser_version: '',
+    os: 'Unknown', os_version: '',
+    device: 'unknown', device_brand: '', device_model: '',
+    is_mobile: 0, engine: '', engine_version: '',
   };
 }

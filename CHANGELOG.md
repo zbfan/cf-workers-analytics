@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0] - 2026-06-11
+
+### Added
+- 集成 device-detector-js 库 (matomo/device-detector 的 JS 移植版本) 用于精确 UA 解析
+- 显示完整 IP 地址 (强制要求)
+- 新增省份(prov)和区县(area)分布图表
+- 新增 `/api/regions` 和 `/api/areas` 分布端点
+
+### Changed
+- IP 地理定位改用 ip9.com.cn API，获取精确的中国地理数据(省份/区县/运营商/大区)
+- 最近访问表格增加"省份"、"区县"、"运营商"列
+- device-detector 解析结果增加 engine/engine_version 字段
+
 ## [1.0.0] - 2026-06-11
 
 ### Added

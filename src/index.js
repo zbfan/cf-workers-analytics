@@ -105,6 +105,7 @@ async function trackDashboardVisit(request, env) {
 
     const record = {
       website_id: 'dashboard',
+      ip: clientIP,
       url: request.url,
       referrer: request.headers.get('Referer') || '',
       screen_size: '',

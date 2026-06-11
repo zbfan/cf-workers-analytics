@@ -67,13 +67,14 @@ export async function handleTrack(request, env, corsHeaders) {
     // Get location from ip9.com.cn API (with Cloudflare fallback)
     const location = await getLocationFromRequest(request);
     
-    // Get client IP for hashing
+    // Get client IP
     const clientIP = getClientIP(request);
     const ipHash = hashIP(clientIP);
 
     // Prepare data for storage
     const record = {
       website_id: data.website_id || 'default',
+      ip: clientIP,
       url: data.url || '',
       referrer: data.referrer || '',
       screen_size: data.screen_size || '',

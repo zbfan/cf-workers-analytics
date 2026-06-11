@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS pageviews (
   referrer TEXT DEFAULT '',
   screen_size TEXT DEFAULT '',
   timestamp INTEGER NOT NULL,
+  ip TEXT DEFAULT '',
   ip_hash TEXT DEFAULT '',
   country TEXT DEFAULT '',
   country_code TEXT DEFAULT '',
