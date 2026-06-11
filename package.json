@@ -1,0 +1,19 @@
+{
+  "name": "han-analytics",
+  "version": "1.0.0",
+  "description": "HanAnalytics - 自部署网站分析仪表板 (Cloudflare Workers)",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute analytics-db --file=src/schema.sql",
+    "db:create": "wrangler d1 create analytics-db"
+  },
+  "keywords": ["analytics", "cloudflare", "workers", "d1", "statistics"],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "ua-parser-js": "^2.0.10"
+  }
+}

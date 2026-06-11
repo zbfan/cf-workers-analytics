@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HanAnalytics 测试页面</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6}
+.container{max-width:800px;margin:0 auto;padding:24px}
+h1{font-size:28px;margin-bottom:8px;color:#0f172a}
+.sub{color:#64748b;margin-bottom:32px}
+.card{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.card h2{font-size:18px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #e2e8f0}
+pre{background:#0f172a;color:#e2e8f0;padding:16px;border-radius:8px;font-size:13px;overflow-x:auto;margin:12px 0}
+code{font-family:'JetBrains Mono','Fira Code',monospace}
+.btn{display:inline-block;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;border:none;transition:all .2s}
+.btn-primary{background:#6366f1;color:white}
+.btn-primary:hover{background:#4f46e5}
+.btn-success{background:#22c55e;color:white}
+.btn-success:hover{background:#16a34a}
+.btn-outline{background:transparent;border:1px solid #e2e8f0;color:#64748b}
+.btn-outline:hover{border-color:#6366f1;color:#6366f1}
+.install-steps{padding-left:20px;margin:12px 0}
+.install-steps li{margin-bottom:8px}
+.status{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500}
+.status-ok{background:#dcfce7;color:#166534}
+.status-pending{background:#fef9c3;color:#854d0e}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}
+@media(max-width:640px){.container{padding:16px}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>&#x1f4ca; HanAnalytics 测试页面</h1>
+  <p class="sub">用于测试网站分析仪表板的本地测试页面</p>
+
+  <div class="card">
+    <h2>&#x1f50c; 部署状态</h2>
+    <p style="margin-bottom:16px;">请先在 Cloudflare 上部署本项目</p>
+    <div id="statusDisplay">
+      <span class="status status-pending" id="deployStatus">&#x23f3; 未部署</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>&#x1f4e6; 安装指南</h2>
+    <p><strong>前置条件：</strong></p>
+    <ul class="install-steps">
+      <li>Node.js >= 18</li>
+      <li>Cloudflare 账号</li>
+      <li>Wrangler CLI (<code>npm install -g wrangler</code>)</li>
+    </ul>
+    <p><strong>部署步骤：</strong></p>
+    <pre><code># 1. 安装依赖
+npm install
+
+# 2. 创建 D1 数据库
+npx wrangler d1 create analytics-db
+
+# 3. 更新 wrangler.toml 中的 database_id
+
+# 4. 初始化数据库
+npx wrangler d1 execute analytics-db --file=src/schema.sql
+
+# 5. 登录 Cloudflare
+npx wrangler login
+
+# 6. 部署
+npx wrangler deploy
+
+# 7. 配置自定义域名（可选）
+# 在 Cloudflare Dashboard - Workers - 触发器 中配置</code></pre>
+  </div>
+
+  <div class="card">
+    <h2>&#x1f517; 集成测试</h2>
+    <p style="margin-bottom:12px;">在下方输入您的分析服务地址，生成嵌入代码：</p>
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+      <input id="serverUrl" type="text" value="https://analytics.yourdomain.com" style="flex:1;min-width:200px;padding:10px 16px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+      <button class="btn btn-primary" onclick="updateEmbed()">生成代码</button>
+    </div>
+    <pre id="embedCode" style="margin-top:0;"><script defer src="https://analytics.yourdomain.com/script.js" data-website-id="test-site"></script></pre>
+    <button class="btn btn-success" onclick="copyCode()">&#x1f4cb; 复制代码</button>
+    <p style="font-size:13px;color:#64748b;margin-top:8px;">将此代码添加到任意网页的 </body> 标签之前即可开始追踪</p>
+  </div>
+
+  <div class="card">
+    <h2>&#x1f4ca; 仪表板预览</h2>
+    <p style="margin-bottom:12px;">部署完成后，点击下方按钮打开仪表板：</p>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="openDashboard()">&#x1f4ca; 打开仪表板</button>
+    </div>
+    <p style="font-size:13px;color:#64748b;margin-top:8px;">仪表板 URL: <code id="dashboardUrl">https://analytics.yourdomain.com</code></p>
+  </div>
+
+  <div class="card">
+    <h2>&#x1f512; 隐私说明</h2>
+    <ul style="padding-left:20px;color:#475569;">
+      <li>IP 地址经过哈希处理，无法逆向还原</li>
+      <li>仅收集浏览器 UA、屏幕分辨率、来源页面等匿名数据</li>
+      <li>不追踪个人信息，不使用 Cookies</li>
+      <li>数据默认保留 90 天，可配置清理策略</li>
+    </ul>
+  </div>
+
+  <div class="card" style="text-align:center;color:#94a3b8;">
+    <p>HanAnalytics v1.0.0 &middot; 本地测试页面</p>
+    <p style="font-size:12px;margin-top:4px;">Powered by Cloudflare Workers + D1</p>
+  </div>
+</div>
+
+<script>
+function updateEmbed() {
+  const url = document.getElementById('serverUrl').value.trim();
+  if (url) {
+    document.getElementById('embedCode').textContent = '<script defer src="' + url + '/script.js" data-website-id="test-site"><\/script>';
+    document.getElementById('dashboardUrl').textContent = url;
+  }
+}
+function copyCode() {
+  const code = document.getElementById('embedCode').textContent;
+  navigator.clipboard.writeText(code).then(function() {
+    alert('已复制到剪贴板！');
+  }).catch(function() {
+    alert('复制失败，请手动复制');
+  });
+}
+function openDashboard() {
+  const url = document.getElementById('serverUrl').value.trim();
+  window.open(url, '_blank');
+}
+</script>
+</body>
+</html>
