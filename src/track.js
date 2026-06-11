@@ -53,18 +53,19 @@ export async function handleTrack(request, env, corsHeaders) {
       data = Object.fromEntries(formData.entries());
     }
 
-    if (!data || !data.user_agent) {
+    if (!data) {
       return new Response(JSON.stringify({ error: 'Invalid data' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
-    // Parse User-Agent
-    const deviceInfo = parseUserAgent(data.user_agent);
+    // Parse User-Agent (兼容无 user_agent 的情况)
+    const userAgent = data.user_agent || request.headers.get('User-Agent') || 'Unknown';
+    const deviceInfo = parseUserAgent(userAgent);
     
-    // Get location from Cloudflare
-    const location = getLocationFromRequest(request);
+    // Get location from ip9.com.cn API (with Cloudflare fallback)
+    const location = await getLocationFromRequest(request);
     
     // Get client IP for hashing
     const clientIP = getClientIP(request);
@@ -79,9 +80,14 @@ export async function handleTrack(request, env, corsHeaders) {
       timestamp: data.timestamp || Date.now(),
       ip_hash: ipHash,
       country: location.country,
+      country_code: location.country_code,
       region: location.region,
       city: location.city,
+      area: location.area,
+      big_area: location.big_area,
       isp: location.isp || deviceInfo.isp,
+      lng: location.lng,
+      lat: location.lat,
       browser: deviceInfo.browser,
       browser_version: deviceInfo.browser_version,
       os: deviceInfo.os,

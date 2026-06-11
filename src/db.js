@@ -33,11 +33,11 @@ export async function insertPageview(env, data) {
   const stmt = env.DB.prepare(`
     INSERT INTO pageviews (
       website_id, url, referrer, screen_size, timestamp,
-      ip_hash, country, region, city, isp,
+      ip_hash, country, country_code, region, city, area, big_area, isp, lng, lat,
       browser, browser_version, os, os_version,
       device, device_brand, device_model, is_mobile,
       lang, hour, day, month, year
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   await stmt.bind(
@@ -48,9 +48,14 @@ export async function insertPageview(env, data) {
     Math.floor(ts / 1000),
     data.ip_hash || '',
     data.country || '',
+    data.country_code || '',
     data.region || '',
     data.city || '',
+    data.area || '',
+    data.big_area || '',
     data.isp || '',
+    data.lng || '',
+    data.lat || '',
     data.browser || '',
     data.browser_version || '',
     data.os || '',

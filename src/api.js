@@ -11,7 +11,7 @@ import {
   getSites,
   exportData,
 } from './db';
-import { getCountryName, getRegionName } from './geo';
+import { getCountryName } from './geo';
 
 export async function handleApi(request, env, corsHeaders) {
   const url = new URL(request.url);
@@ -52,6 +52,16 @@ export async function handleApi(request, env, corsHeaders) {
   // Route: GET /api/countries - Country distribution
   if (path === 'countries' && method === 'GET') {
     return await getCountryData(env, websiteId, since, corsHeaders);
+  }
+
+  // Route: GET /api/regions - Region/Area distribution
+  if (path === 'regions' && method === 'GET') {
+    return await getDistData(env, websiteId, 'region', since, corsHeaders, 20);
+  }
+
+  // Route: GET /api/areas - District/Area distribution
+  if (path === 'areas' && method === 'GET') {
+    return await getDistData(env, websiteId, 'area', since, corsHeaders, 20);
   }
 
   // Route: GET /api/apps - App/Referrer distribution
@@ -156,8 +166,8 @@ async function getTimeSeriesData(env, websiteId, since, groupBy, corsHeaders) {
 /**
  * Get distribution data
  */
-async function getDistData(env, websiteId, field, since, corsHeaders) {
-  const data = await getDistribution(env, websiteId, field, since, 20);
+async function getDistData(env, websiteId, field, since, corsHeaders, limit = 20) {
+  const data = await getDistribution(env, websiteId, field, since, limit);
   return new Response(JSON.stringify({ data }), {
     headers: { 'Content-Type': 'application/json', ...corsHeaders },
   });

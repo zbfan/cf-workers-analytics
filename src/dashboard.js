@@ -99,13 +99,18 @@ select:hover,button:hover{background:var(--bg-card-hover);border-color:var(--pri
   </div>
   <div class="charts-section grid-3">
     <div class="chart-card"><h3>&#x1f310;国家分布</h3><div id="countryChart"><div class="loading"><div class="spinner"></div></div></div></div>
-    <div class="chart-card"><h3>&#x1f5a5;浏览器</h3><div id="browserChart"><div class="loading"><div class="spinner"></div></div></div></div>
-    <div class="chart-card"><h3>&#x1f4bb;操作系统</h3><div id="osChart"><div class="loading"><div class="spinner"></div></div></div></div>
+    <div class="chart-card"><h3>&#x1f3e0;地区分布(省)</h3><div id="regionChart"><div class="loading"><div class="spinner"></div></div></div></div>
+    <div class="chart-card"><h3>&#x1f3ed;区县分布</h3><div id="areaChart"><div class="loading"><div class="spinner"></div></div></div></div>
   </div>
   <div class="charts-section grid-3">
+    <div class="chart-card"><h3>&#x1f5a5;浏览器</h3><div id="browserChart"><div class="loading"><div class="spinner"></div></div></div></div>
+    <div class="chart-card"><h3>&#x1f4bb;操作系统</h3><div id="osChart"><div class="loading"><div class="spinner"></div></div></div></div>
     <div class="chart-card"><h3>&#x1f30d;网络运营商</h3><div id="networkChart"><div class="loading"><div class="spinner"></div></div></div></div>
+  </div>
+  <div class="charts-section grid-3">
+    <div class="chart-card"><h3>&#x1f4cd;设备类型</h3><div id="brandChart"><div class="loading"><div class="spinner"></div></div></div></div>
     <div class="chart-card"><h3>&#x1f517;来源页面</h3><div id="referrerChart"><div class="loading"><div class="spinner"></div></div></div></div>
-    <div class="chart-card"><h3>&#x1f4cd;设备品牌</h3><div id="brandChart"><div class="loading"><div class="spinner"></div></div></div></div>
+    <div class="chart-card"><h3>&#x1f4f1;设备品牌</h3><div id="deviceBrandChart"><div class="loading"><div class="spinner"></div></div></div></div>
   </div>
   <div class="chart-card" style="margin-bottom:24px;">
     <h3>&#x1f552;最近访问<span class="badge">最新100条</span></h3>
@@ -120,10 +125,10 @@ document.addEventListener('DOMContentLoaded',function(){loadSites();loadVersion(
 async function loadVersion(){try{var r=await fetch('/api/version'),d=await r.json();document.getElementById('versionTag').textContent='v'+d.version;document.getElementById('footerVersion').textContent=d.version}catch(e){}}
 async function loadSites(){try{var r=await fetch('/api/sites'),d=await r.json(),list=document.getElementById('siteList'),sel=document.getElementById('siteSelect');list.innerHTML='';sel.innerHTML='';(d.data||[]).forEach(function(s){var t=document.createElement('span');t.className='site-tag'+(s.website_id===site?' active':'');t.textContent=s.website_id;t.onclick=function(){switchSite(s.website_id)};list.appendChild(t);var o=document.createElement('option');o.value=s.website_id;o.textContent=s.website_id;if(s.website_id===site)o.selected=true;sel.appendChild(o)})}catch(e){}}
 function switchSite(s){site=s;document.getElementById('siteSelect').value=s;loadData();loadSites()}
-async function loadData(){period=document.getElementById('periodSelect').value;try{var r=await fetch('/api/overview?website_id='+site+'&period='+period),d=await r.json();updateOverview(d);loadTimeSeries();loadDist('browsers','browserChart');loadDist('os','osChart');loadDist('devices','deviceChart');loadDist('countries','countryChart');loadDist('networks','networkChart');loadDist('apps','referrerChart');loadBrand();loadRecent()}catch(e){}}
+async function loadData(){period=document.getElementById('periodSelect').value;try{var r=await fetch('/api/overview?website_id='+site+'&period='+period),d=await r.json();updateOverview(d);loadTimeSeries();loadDist('browsers','browserChart');loadDist('os','osChart');loadDist('devices','deviceChart');loadDist('countries','countryChart');loadDist('regions','regionChart');loadDist('areas','areaChart');loadDist('networks','networkChart');loadDist('apps','referrerChart');loadBrand();loadRecent()}catch(e){}}
 async function loadTimeSeries(){try{var r=await fetch('/api/timeseries?website_id='+site+'&period='+period+'&groupBy=hour'),d=await r.json();renderTimeChart(d.data||[])}catch(e){}}
 async function loadDist(ep,el){try{var r=await fetch('/api/'+ep+'?website_id='+site+'&period='+period),d=await r.json();renderBar(el,d.data||[])}catch(e){}}
-async function loadBrand(){try{var r=await fetch('/api/devices?website_id='+site+'&period='+period),d=await r.json();renderBar('brandChart',(d.data||[]).filter(function(x){return x.device&&x.device!='unknown'}))}catch(e){}}
+async function loadBrand(){try{var r=await fetch('/api/devices?website_id='+site+'&period='+period),d=await r.json();renderBar('brandChart',(d.data||[]).filter(function(x){return x.device&&x.device!='unknown'}));var r2=await fetch('/api/devices?website_id='+site+'&period='+period),d2=await r2.json();renderBar('deviceBrandChart',(d2.data||[]).filter(function(x){return x.device_brand&&x.device_brand!=''}))}catch(e){}}
 async function loadRecent(){try{var r=await fetch('/api/recent?website_id='+site),d=await r.json();renderRecent(d.data||[])}catch(e){}}
 function updateOverview(d){document.getElementById('statTotal').textContent=f(d.total||0);document.getElementById('statUnique').textContent=f(d.unique||0);document.getElementById('statHourly').textContent=f(d.currentHour||0);document.getElementById('statAvgDaily').textContent='日均:'+f(d.avgDaily||0);document.getElementById('statUniqueRate').textContent=(d.unique&&d.total?(d.unique/d.total*100).toFixed(1):'0')+'%独立率';document.getElementById('statDays').textContent=(d.timeStats?d.timeStats.length:0)+'天'}
 function renderTimeChart(d){var c=document.getElementById('timeChartContainer');if(!d||!d.length){c.innerHTML='<div class="empty-state"><div class="emoji">&#x1f4ca;</div><p>暂无数据</p></div>';return}
