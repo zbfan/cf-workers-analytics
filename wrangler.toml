@@ -11,5 +11,5 @@ database_id = "d6027b7b-74a3-4961-8e9a-2a879cc1b28f"
 
 # Environment variables
 [vars]
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 SITE_URL = "https://cf-workers-analytics.yourdomain.com"

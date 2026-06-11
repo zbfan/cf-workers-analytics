@@ -79,6 +79,15 @@ export async function handleApi(request, env, corsHeaders) {
     return await getRecent(env, websiteId, corsHeaders);
   }
 
+  // Route: GET /api/history - Visit history with search & pagination
+  if (path === 'history' && method === 'GET') {
+    const q = url.searchParams.get('q') || '';
+    const date = url.searchParams.get('date') || '';
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const pageSize = parseInt(url.searchParams.get('pageSize') || '50');
+    return await getHistory(env, websiteId, q, date, page, pageSize, corsHeaders);
+  }
+
   // Route: GET /api/sites - List all sites
   if (path === 'sites' && method === 'GET') {
     return await getAllSites(env, corsHeaders);
@@ -199,6 +208,55 @@ async function getRecent(env, websiteId, corsHeaders) {
     time: v.timestamp ? new Date(v.timestamp * 1000).toLocaleString('zh-CN') : '',
   }));
   return new Response(JSON.stringify({ data: formatted }), {
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
+  });
+}
+
+/**
+ * Get visit history with search and pagination
+ */
+async function getHistory(env, websiteId, q, date, page, pageSize, corsHeaders) {
+  let query = 'SELECT * FROM pageviews WHERE website_id = ?';
+  const params = [websiteId || 'default'];
+
+  // Date filter
+  if (date) {
+    const d = new Date(date);
+    const startTs = Math.floor(d.getTime() / 1000);
+    const endTs = startTs + 86400;
+    query += ' AND timestamp >= ? AND timestamp < ?';
+    params.push(startTs, endTs);
+  }
+
+  // Search filter
+  if (q) {
+    query += ' AND (ip LIKE ? OR country LIKE ? OR region LIKE ? OR city LIKE ? OR area LIKE ? OR browser LIKE ? OR os LIKE ? OR device LIKE ? OR device_brand LIKE ? OR url LIKE ? OR isp LIKE ?)';
+    const like = `%${q}%`;
+    params.push(like, like, like, like, like, like, like, like, like, like, like);
+  }
+
+  // Count total
+  const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
+  const countResult = await env.DB.prepare(countQuery).bind(...params).first();
+  const total = countResult?.total || 0;
+
+  // Paginate
+  const offset = (page - 1) * pageSize;
+  query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
+  params.push(pageSize, offset);
+
+  const results = await env.DB.prepare(query).bind(...params).all();
+  const formatted = (results.results || []).map(v => ({
+    ...v,
+    country_display: getCountryName(v.country),
+    time: v.timestamp ? new Date(v.timestamp * 1000).toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
+    }) : '',
+  }));
+
+  return new Response(JSON.stringify({ data: formatted, total, page, pageSize }), {
     headers: { 'Content-Type': 'application/json', ...corsHeaders },
   });
 }

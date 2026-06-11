@@ -64,6 +64,29 @@ select:hover,button:hover{background:var(--bg-card-hover);border-color:var(--pri
 .empty-state .emoji{font-size:40px;margin-bottom:16px}
 .footer{text-align:center;padding:20px;color:var(--text-secondary);font-size:12px;border-top:1px solid var(--border);margin-top:24px}
 .tooltip{position:fixed;background:#1e293b;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;pointer-events:none;z-index:1000;display:none}
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.filter-bar input,.filter-bar select{background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;min-width:120px}
+.filter-bar input:focus,.filter-bar select:focus{border-color:var(--primary);outline:none}
+.filter-bar button{padding:6px 14px;font-size:12px}
+.filter-bar .filter-label{font-size:11px;color:var(--text-secondary);margin-right:4px}
+.history-section{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:24px}
+.history-section h3{font-size:15px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.history-search{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.history-search input{background:rgba(0,0,0,.3);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:13px;flex:1;min-width:200px}
+.history-search input:focus{border-color:var(--primary);outline:none}
+.history-search button{padding:8px 16px;font-size:13px}
+.history-timeline{position:relative;padding-left:24px}
+.history-timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:var(--border)}
+.history-item{position:relative;margin-bottom:12px;padding:12px 16px;background:rgba(255,255,255,.02);border-radius:8px;border:1px solid rgba(51,65,85,.5)}
+.history-item::before{content:'';position:absolute;left:-20px;top:16px;width:10px;height:10px;border-radius:50%;background:var(--primary);border:2px solid var(--bg-card)}
+.history-item .time{font-size:12px;color:var(--primary-light);font-weight:600;margin-bottom:4px}
+.history-item .info{font-size:12px;color:var(--text-secondary);display:flex;flex-wrap:wrap;gap:8px}
+.history-item .info span{display:inline-flex;align-items:center;gap:4px}
+.history-item .url{font-size:12px;color:var(--text-primary);margin-top:4px;word-break:break-all}
+.pagination{display:flex;justify-content:center;gap:8px;margin-top:16px}
+.pagination button{padding:6px 14px;font-size:12px}
+.pagination button.active{background:var(--primary);border-color:var(--primary)}
+.pagination button:disabled{opacity:.4;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -114,22 +137,44 @@ select:hover,button:hover{background:var(--bg-card-hover);border-color:var(--pri
   </div>
   <div class="chart-card" style="margin-bottom:24px;">
     <h3>&#x1f552;最近访问<span class="badge">最新100条</span></h3>
+    <div class="filter-bar" id="recentFilter">
+      <span class="filter-label">筛选:</span>
+      <input type="text" id="filterIP" placeholder="IP地址" oninput="applyRecentFilter()">
+      <input type="text" id="filterCountry" placeholder="国家" oninput="applyRecentFilter()">
+      <input type="text" id="filterRegion" placeholder="省份" oninput="applyRecentFilter()">
+      <input type="text" id="filterBrowser" placeholder="浏览器" oninput="applyRecentFilter()">
+      <input type="text" id="filterOS" placeholder="操作系统" oninput="applyRecentFilter()">
+      <input type="text" id="filterDevice" placeholder="设备" oninput="applyRecentFilter()">
+      <input type="text" id="filterURL" placeholder="页面URL" oninput="applyRecentFilter()">
+      <button onclick="clearRecentFilter()">&#x2716; 清除</button>
+    </div>
     <div style="overflow-x:auto;" id="recentTable"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+  <div class="history-section">
+    <h3>&#x1f4c5;访问历史<span class="badge">精确到分钟</span></h3>
+    <div class="history-search">
+      <input type="text" id="historySearch" placeholder="搜索IP、国家、省份、浏览器、OS、设备、URL..." onkeydown="if(event.key==='Enter')loadHistory()">
+      <input type="date" id="historyDate" style="min-width:140px;">
+      <button onclick="loadHistory()">&#x1f50d; 搜索</button>
+      <button onclick="clearHistorySearch()">&#x2716; 清除</button>
+    </div>
+    <div id="historyContainer"><div class="loading"><div class="spinner"></div></div></div>
+    <div class="pagination" id="historyPagination"></div>
   </div>
 </div>
 <div class="footer">HanAnalytics v<span id="footerVersion">1.0.0</span> &middot; Powered by Cloudflare Workers</div>
 <div class="tooltip" id="tooltip"></div>
 <script>
-var site='default',period='7d';
-document.addEventListener('DOMContentLoaded',function(){loadSites();loadVersion();loadData();setInterval(loadData,30000)});
+var site='default',period='7d',recentData=[],historyPage=1,historyPageSize=50;
+document.addEventListener('DOMContentLoaded',function(){loadSites();loadVersion();loadData();setInterval(loadData,30000);var today=new Date().toISOString().split('T')[0];document.getElementById('historyDate').value=today;loadHistory()});
 async function loadVersion(){try{var r=await fetch('/api/version'),d=await r.json();document.getElementById('versionTag').textContent='v'+d.version;document.getElementById('footerVersion').textContent=d.version}catch(e){}}
 async function loadSites(){try{var r=await fetch('/api/sites'),d=await r.json(),list=document.getElementById('siteList'),sel=document.getElementById('siteSelect');list.innerHTML='';sel.innerHTML='';(d.data||[]).forEach(function(s){var t=document.createElement('span');t.className='site-tag'+(s.website_id===site?' active':'');t.textContent=s.website_id;t.onclick=function(){switchSite(s.website_id)};list.appendChild(t);var o=document.createElement('option');o.value=s.website_id;o.textContent=s.website_id;if(s.website_id===site)o.selected=true;sel.appendChild(o)})}catch(e){}}
-function switchSite(s){site=s;document.getElementById('siteSelect').value=s;loadData();loadSites()}
+function switchSite(s){site=s;document.getElementById('siteSelect').value=s;loadData();loadSites();loadHistory()}
 async function loadData(){period=document.getElementById('periodSelect').value;try{var r=await fetch('/api/overview?website_id='+site+'&period='+period),d=await r.json();updateOverview(d);loadTimeSeries();loadDist('browsers','browserChart');loadDist('os','osChart');loadDist('devices','deviceChart');loadDist('countries','countryChart');loadDist('regions','regionChart');loadDist('areas','areaChart');loadDist('networks','networkChart');loadDist('apps','referrerChart');loadBrand();loadRecent()}catch(e){}}
 async function loadTimeSeries(){try{var r=await fetch('/api/timeseries?website_id='+site+'&period='+period+'&groupBy=hour'),d=await r.json();renderTimeChart(d.data||[])}catch(e){}}
 async function loadDist(ep,el){try{var r=await fetch('/api/'+ep+'?website_id='+site+'&period='+period),d=await r.json();renderBar(el,d.data||[])}catch(e){}}
 async function loadBrand(){try{var r=await fetch('/api/devices?website_id='+site+'&period='+period),d=await r.json();renderBar('brandChart',(d.data||[]).filter(function(x){return x.device&&x.device!='unknown'}));var r2=await fetch('/api/devices?website_id='+site+'&period='+period),d2=await r2.json();renderBar('deviceBrandChart',(d2.data||[]).filter(function(x){return x.device_brand&&x.device_brand!=''}))}catch(e){}}
-async function loadRecent(){try{var r=await fetch('/api/recent?website_id='+site),d=await r.json();renderRecent(d.data||[])}catch(e){}}
+async function loadRecent(){try{var r=await fetch('/api/recent?website_id='+site),d=await r.json();recentData=d.data||[];renderRecent(recentData)}catch(e){}}
 function updateOverview(d){document.getElementById('statTotal').textContent=f(d.total||0);document.getElementById('statUnique').textContent=f(d.unique||0);document.getElementById('statHourly').textContent=f(d.currentHour||0);document.getElementById('statAvgDaily').textContent='日均:'+f(d.avgDaily||0);document.getElementById('statUniqueRate').textContent=(d.unique&&d.total?(d.unique/d.total*100).toFixed(1):'0')+'%独立率';document.getElementById('statDays').textContent=(d.timeStats?d.timeStats.length:0)+'天'}
 function renderTimeChart(d){var c=document.getElementById('timeChartContainer');if(!d||!d.length){c.innerHTML='<div class="empty-state"><div class="emoji">&#x1f4ca;</div><p>暂无数据</p></div>';return}
 var cv=document.createElement('canvas');c.innerHTML='';c.appendChild(cv);var ctx=cv.getContext('2d'),w=c.clientWidth||600,h=200;cv.width=w*2;cv.height=h*2;cv.style.width=w+'px';cv.style.height=h+'px';ctx.scale(2,2)
@@ -143,7 +188,14 @@ cv.onmousemove=function(e){var rect=cv.getBoundingClientRect(),mx=e.clientX-rect
 function renderBar(elId,d){var c=document.getElementById(elId);if(!d||!d.length){c.innerHTML='<div class="empty-state"><p style="color:var(--text-secondary);font-size:13px;">暂无数据</p></div>';return}
 var max=Math.max.apply(null,d.map(function(x){return parseInt(x.count)})),colors=['c1','c2','c3','c4','c5','c6'],html='<div class="bar-chart">';d.slice(0,10).forEach(function(item,i){var pct=max>0?parseInt(item.count)/max*100:0,k=Object.keys(item).find(function(k){return k!=='count'&&k!=='name'}),dn=item.display||item[k]||k||item.name||'未知';html+='<div class="bar-item"><span class="bar-label" title="'+dn+'">'+tr(dn,15)+'</span><div class="bar-track"><div class="bar-fill '+colors[i%colors.length]+'" style="width:'+pct+'%"></div></div><span class="bar-value">'+f(item.count)+'</span></div>'});html+='</div>';c.innerHTML=html}
 function renderRecent(d){var c=document.getElementById('recentTable');if(!d||!d.length){c.innerHTML='<div class="empty-state"><div class="emoji">&#x1f4ad;</div><p>暂无访问记录</p></div>';return}
-var html='<table class="data-table"><thead><tr><th>\u65f6\u95f4</th><th>IP</th><th>\u56fd\u5bb6</th><th>\u7701\u4efd</th><th>\u533a\u53bf</th><th>\u8fd0\u8425\u5546</th><th>\u6d4f\u89c8\u5668</th><th>OS</th><th>\u8bbe\u5907</th></tr></thead><tbody>';d.slice(0,50).forEach(function(v){var di=v.is_mobile==1?'&#x1f4f1;':'&#x1f4bb;',cd=v.country_display||v.country||'-';html+='<tr><td style="white-space:nowrap;font-size:12px;">'+(v.time||'-')+'</td><td style="font-family:monospace;font-size:12px;">'+(v.ip||v.ip_hash||'-')+'</td><td>'+cd+'</td><td>'+(v.region||'-')+'</td><td>'+(v.area||v.city||'-')+'</td><td>'+(v.isp||'-')+'</td><td>'+(v.browser||'-')+' '+(v.browser_version||'').substring(0,5)+'</td><td>'+(v.os||'-')+'</td><td>'+di+' '+(v.device||'-')+(v.device_brand?' '+v.device_brand:'')+'</td></tr>'});html+='</tbody></table>';c.innerHTML=html}
+var html='<table class="data-table"><thead><tr><th>\u65f6\u95f4</th><th>IP</th><th>\u56fd\u5bb6</th><th>\u7701\u4efd</th><th>\u533a\u53bf</th><th>\u8fd0\u8425\u5546</th><th>\u6d4f\u89c8\u5668</th><th>OS</th><th>\u8bbe\u5907</th></tr></thead><tbody>';d.slice(0,50).forEach(function(v){var di=v.is_mobile==1?'&#x1f4f1;':'&#x1f4bb;',cd=v.country_display||v.country||'-';var osStr=(v.os||'-')+(v.os_version?' '+v.os_version:'');var devStr=(v.device||'-');if(v.device_brand)devStr+=' '+v.device_brand;if(v.device_model)devStr+=' '+v.device_model;html+='<tr><td style="white-space:nowrap;font-size:12px;">'+(v.time||'-')+'</td><td style="font-family:monospace;font-size:12px;">'+(v.ip||v.ip_hash||'-')+'</td><td>'+cd+'</td><td>'+(v.region||'-')+'</td><td>'+(v.area||v.city||'-')+'</td><td>'+(v.isp||'-')+'</td><td>'+(v.browser||'-')+' '+(v.browser_version||'').substring(0,5)+'</td><td>'+osStr+'</td><td>'+di+' '+devStr+'</td></tr>'});html+='</tbody></table>';c.innerHTML=html}
+function applyRecentFilter(){var ip=document.getElementById('filterIP').value.toLowerCase(),country=document.getElementById('filterCountry').value.toLowerCase(),region=document.getElementById('filterRegion').value.toLowerCase(),browser=document.getElementById('filterBrowser').value.toLowerCase(),os=document.getElementById('filterOS').value.toLowerCase(),device=document.getElementById('filterDevice').value.toLowerCase(),url=document.getElementById('filterURL').value.toLowerCase();var filtered=recentData.filter(function(v){if(ip&&!(v.ip||'').toLowerCase().includes(ip))return false;if(country&&!(v.country||'').toLowerCase().includes(country))return false;if(region&&!(v.region||'').toLowerCase().includes(region))return false;if(browser&&!(v.browser||'').toLowerCase().includes(browser))return false;if(os&&!(v.os||'').toLowerCase().includes(os))return false;if(device&&!(v.device||'').toLowerCase().includes(device)&&!(v.device_brand||'').toLowerCase().includes(device))return false;if(url&&!(v.url||'').toLowerCase().includes(url))return false;return true});renderRecent(filtered)}
+function clearRecentFilter(){document.getElementById('filterIP').value='';document.getElementById('filterCountry').value='';document.getElementById('filterRegion').value='';document.getElementById('filterBrowser').value='';document.getElementById('filterOS').value='';document.getElementById('filterDevice').value='';document.getElementById('filterURL').value='';renderRecent(recentData)}
+async function loadHistory(){var search=document.getElementById('historySearch').value;var date=document.getElementById('historyDate').value;var url='/api/history?website_id='+site+'&page='+historyPage+'&pageSize='+historyPageSize;if(search)url+='&q='+encodeURIComponent(search);if(date)url+='&date='+date;try{var r=await fetch(url),d=await r.json();renderHistory(d.data||[],d.total||0)}catch(e){document.getElementById('historyContainer').innerHTML='<div class="empty-state"><p>加载失败</p></div>'}}
+function renderHistory(d,total){var c=document.getElementById('historyContainer');if(!d||!d.length){c.innerHTML='<div class="empty-state"><div class="emoji">&#x1f4ad;</div><p>暂无访问记录</p></div>';document.getElementById('historyPagination').innerHTML='';return}
+var html='<div class="history-timeline">';d.forEach(function(v){var di=v.is_mobile==1?'&#x1f4f1;':'&#x1f4bb;',cd=v.country_display||v.country||'-';var osStr=(v.os||'-')+(v.os_version?' '+v.os_version:'');var devStr=(v.device||'-');if(v.device_brand)devStr+=' '+v.device_brand;if(v.device_model)devStr+=' '+v.device_model;html+='<div class="history-item"><div class="time">'+(v.time||'-')+'</div><div class="info"><span>IP: '+(v.ip||v.ip_hash||'-')+'</span><span>'+cd+'</span><span>'+(v.region||'-')+'</span><span>'+(v.area||v.city||'-')+'</span><span>'+(v.isp||'-')+'</span><span>'+(v.browser||'-')+' '+(v.browser_version||'').substring(0,5)+'</span><span>'+osStr+'</span><span>'+di+' '+devStr+'</span></div><div class="url">'+(v.url||'-')+'</div></div>'});html+='</div>';c.innerHTML=html
+var totalPages=Math.ceil(total/historyPageSize);var pg=document.getElementById('historyPagination');var pgHtml='';if(totalPages>1){pgHtml+='<button '+(historyPage<=1?'disabled':'')+' onclick="historyPage='+(historyPage-1)+';loadHistory()">&#x25c0; 上一页</button>';var start=Math.max(1,historyPage-2),end=Math.min(totalPages,historyPage+2);for(var i=start;i<=end;i++){pgHtml+='<button class="'+(i===historyPage?'active':'')+'" onclick="historyPage='+i+';loadHistory()">'+i+'</button>'}pgHtml+='<button '+(historyPage>=totalPages?'disabled':'')+' onclick="historyPage='+(historyPage+1)+';loadHistory()">下一页 &#x25b6;</button>'}pg.innerHTML=pgHtml}
+function clearHistorySearch(){document.getElementById('historySearch').value='';historyPage=1;loadHistory()}
 async function exportData(){try{var r=await fetch('/api/export?website_id='+site),b=await r.blob(),u=window.URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='analytics-'+site+'-'+Date.now()+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);window.URL.revokeObjectURL(u)}catch(e){alert('导出失败: '+e.message)}}
 function f(n){if(!n)return'0';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toString()}
 function tr(s,l){if(!s)return'-';return s.length>l?s.substring(0,l)+'...':s}
